@@ -3,16 +3,35 @@ const app = express();
 const http = require("http").createServer(app);
 const io = require("socket.io")(http);
 let port = process.env.PORT || 8080;
-let clientCount = 0;
-let users = [
+let userCount = 0;
+let users = [];
 
-];
+function removeUser(id) {
+    users = users.filter(user => user.id !== id);
+}
 
 app.use(express.static(__dirname + "/public"));
 
 io.on("connection", socket => {
-    clientCount++;
-    socket.broadcast.emit("chat message", "User connected");
+    userCount++;
+    socket.userName = `user${userCount}`;
+    users.push(socket);
+
+    socket.emit("online users", {
+        id: socket.id,
+        users: users.map(user => {
+            return {
+                userName: user.userName,
+                id: user.id
+            };
+        })
+    });
+
+    socket.broadcast.emit("chat message", `${socket.userName} connected`);
+
+    socket.on("connected", () => {
+        socket.emit("connected", socket.userName);
+    });
 
     socket.on("chat message", msg => {
         console.log(`message from ${msg.name}: ${msg.msg}`);
@@ -23,12 +42,21 @@ io.on("connection", socket => {
     });
 
     socket.on("user-typing", msg => {
-        console.log(msg);
-        socket.broadcast.emit("user-typing", msg);
+        console.log(msg.msg);
+        socket.userName = msg.userName;
+        socket.broadcast.emit("user-typing", msg.msg);
     });
 
     socket.on("disconnect", () => {
-        clientCount--;
+        removeUser(socket.id);
+        socket.broadcast.emit("online users", {
+            users: users.map(user => {
+                return {
+                    userName: user.userName,
+                    id: user.id
+                };
+            })
+        });
         console.log("socket disconnected");
     });
 });

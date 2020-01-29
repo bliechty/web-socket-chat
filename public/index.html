@@ -18,6 +18,25 @@
         $(function () {
             let socket = io();
             let timeout;
+
+            function onlineUsersString(id, users) {
+                console.log(users);
+                let usersString = "<div>Online Users:</div>";
+                for (let user of users) {
+                    if (id && user.id === id) {
+                        usersString += `<div>${user.userName} (you)</div>`;
+                    } else {
+                        usersString += `<div>${user.userName}</div>`;
+                    }
+                }
+                return usersString;
+            }
+
+            socket.emit("connected");
+
+            socket.on("connected", userName => {
+                $("#user").val(userName);
+            });
             //on form submition emit a "chat message" event to the socket -- to the server
             $("form").submit(function(e){
                 e.preventDefault(); // prevents page reloading
@@ -42,15 +61,29 @@
                 $("#user-typing").text(msg);
             });
 
+            socket.on("online users", (obj) => {
+                $("#online-users").html(onlineUsersString(obj.id, obj.users));
+            });
+
             $("#m").keydown(e => {
-                if (e.key !== "Enter" && e.key !== "Tab") {
-                    socket.emit("user-typing", `${$("#user").val()} is typing...`);
+                const userName = $("#user").val();
+                if (e.key !== "Enter" && e.key !== "Tab" && e.key !== "Meta" && e.key !== "Shift") {
+                    socket.emit("user-typing", {
+                        msg: `${userName} is typing...`,
+                        userName: userName
+                    });
                     window.clearTimeout(timeout);
                     timeout = window.setTimeout(() => {
-                        socket.emit("user-typing", "");
+                        socket.emit("user-typing", {
+                            msg: "",
+                            userName: userName
+                        });
                     }, 1500);
-                } else if (e.key === "Enter" && e.key !== "Tab") {
-                    socket.emit("user-typing", "");
+                } else if (e.key === "Enter") {
+                    socket.emit("user-typing", {
+                        msg: "",
+                        userName: userName
+                    });
                 }
             });
         });
@@ -58,8 +91,12 @@
     <ul id="messages"></ul>
     <div id="user-typing"></div>
     <form action="">
+        <span>Name:</span>
         <input id="user" />
+        <span>Chat:</span>
         <input id="m" autocomplete="off" /><button>Send</button>
     </form>
+    <div id="online-users">
+    </div>
 </body>
 </html>
