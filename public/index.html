@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Web Socket</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<!--    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.8.2/css/all.css"-->
+<!--          integrity="sha384-oS3vJWv+0UjzBfQzYUhtDYW+Pj2yciDJxpsK1OYPAYjqT085Qq/1cq5FLXAZQ7Ay"-->
+<!--          crossorigin="anonymous">-->
+<!--    <link href="https://fonts.googleapis.com/css?family=Roboto&display=swap" rel="stylesheet">-->
+<!--    <script src="action.js" defer></script>-->
+<!--    <link rel="stylesheet" href="style.css">-->
+</head>
+<body>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://code.jquery.com/jquery-1.11.1.js"></script>
+    <script>
+        $(function () {
+            let socket = io();
+            let timeout;
+            //on form submition emit a "chat message" event to the socket -- to the server
+            $("form").submit(function(e){
+                e.preventDefault(); // prevents page reloading
+                socket.emit("chat message", {msg: $("#m").val(), name: $("#user").val()});
+                $("#m").val("");
+                return false;
+            });
+            // listen to the "chat message" on the socket -- coming from the server
+            socket.on("chat message", function(msg){
+                if (typeof msg === "object") {
+                    $("#messages").append($("<li>").text(`Message from ${msg.name}: ${msg.msg}`));
+                } else {
+                    $("#messages").append($("<li>").text(msg));
+                }
+
+                if($("#messages li").length > 5){
+                    $("#messages li").eq(0).remove();
+                }
+            });
+
+            socket.on("user-typing", msg => {
+                $("#user-typing").text(msg);
+            });
+
+            $("#m").keydown(e => {
+                if (e.key !== "Enter" && e.key !== "Tab") {
+                    socket.emit("user-typing", `${$("#user").val()} is typing...`);
+                    window.clearTimeout(timeout);
+                    timeout = window.setTimeout(() => {
+                        socket.emit("user-typing", "");
+                    }, 1500);
+                } else if (e.key === "Enter" && e.key !== "Tab") {
+                    socket.emit("user-typing", "");
+                }
+            });
+        });
+    </script>
+    <ul id="messages"></ul>
+    <div id="user-typing"></div>
+    <form action="">
+        <input id="user" />
+        <input id="m" autocomplete="off" /><button>Send</button>
+    </form>
+</body>
+</html>
