@@ -20,16 +20,20 @@
             let timeout;
 
             function onlineUsersString(id, users) {
-                console.log(users);
                 let usersString = "<div>Online Users:</div>";
+                let usersOptions = `<option value="all">All Other Users</option>`;
                 for (let user of users) {
                     if (id && user.id === id) {
                         usersString += `<div>${user.userName} (you)</div>`;
                     } else {
                         usersString += `<div>${user.userName}</div>`;
+                        usersOptions += `<option value=${user.userName}>${user.userName}</option>`;
                     }
                 }
-                return usersString;
+                return {
+                    usersString: usersString,
+                    usersOptions: usersOptions
+                };
             }
 
             socket.emit("connected");
@@ -38,10 +42,20 @@
                 $("#user").val(userName);
             });
             //on form submition emit a "chat message" event to the socket -- to the server
-            $("form").submit(function(e){
+            $("#chat").submit(function(e){
                 e.preventDefault(); // prevents page reloading
-                socket.emit("chat message", {msg: $("#m").val(), name: $("#user").val()});
+                socket.emit("chat message", {
+                    msg: $("#m").val(),
+                    name: $("#user").val(),
+                    toWho: $("#to-who").val()
+                });
                 $("#m").val("");
+                return false;
+            });
+
+            $("#change-name").submit(function(e) {
+                e.preventDefault();
+                socket.emit("change name", $("#user").val());
                 return false;
             });
             // listen to the "chat message" on the socket -- coming from the server
@@ -62,27 +76,30 @@
             });
 
             socket.on("online users", (obj) => {
-                $("#online-users").html(onlineUsersString(obj.id, obj.users));
+                const userObj = onlineUsersString(obj.id, obj.users);
+                $("#online-users").html(userObj.usersString);
+                $("#to-who").html(userObj.usersOptions);
+            });
+
+            socket.on("change name error", msg => {
+                $("#error").text(msg);
             });
 
             $("#m").keydown(e => {
-                const userName = $("#user").val();
                 if (e.key !== "Enter" && e.key !== "Tab" && e.key !== "Meta" && e.key !== "Shift") {
                     socket.emit("user-typing", {
-                        msg: `${userName} is typing...`,
-                        userName: userName
+                        msg: "yes",
+                        toWho: $("#to-who").val()
                     });
-                    window.clearTimeout(timeout);
-                    timeout = window.setTimeout(() => {
+                   clearTimeout(timeout);
+                    timeout = setTimeout(() => {
                         socket.emit("user-typing", {
-                            msg: "",
-                            userName: userName
+                            msg: "no"
                         });
                     }, 1500);
                 } else if (e.key === "Enter") {
                     socket.emit("user-typing", {
-                        msg: "",
-                        userName: userName
+                        msg: "no"
                     });
                 }
             });
@@ -90,11 +107,20 @@
     </script>
     <ul id="messages"></ul>
     <div id="user-typing"></div>
-    <form action="">
+    <form id="chat" action="">
+        <span>Chat:</span>
+        <input id="m" autocomplete="off" />
+        <button>Send</button>
+        <span>to</span>
+        <select id="to-who">
+            <option value="all">All Other Users</option>
+        </select>
+    </form>
+    <form id="change-name" action="">
         <span>Name:</span>
         <input id="user" />
-        <span>Chat:</span>
-        <input id="m" autocomplete="off" /><button>Send</button>
+        <button>Change name</button>
+        <div id="error"></div>
     </form>
     <div id="online-users">
     </div>
